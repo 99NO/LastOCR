@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.example.lastocr.ocr.MlKitOcrRunner
 import com.example.lastocr.ocr.PunctuationOrientationAnalyzer
 import com.example.lastocr.ocr.model.CandidateAnalysis
+import com.example.lastocr.ocr.model.CandidateKind
 import com.example.lastocr.ocr.model.OrientationComparison
 import com.example.lastocr.ocr.model.OrientationDecision
 import com.example.lastocr.util.OverlayMapper
@@ -75,10 +76,12 @@ fun OcrExperimentScreen() {
     var isRunning by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("이미지를 선택한 뒤 OCR을 실행하세요. 실험용: 마침표 Symbol 위치만 사용합니다.") }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedOverlay by remember { mutableStateOf(CandidateKind.ORIGINAL) }
 
     fun loadImageFromUri(uri: Uri, sourceLabel: String) {
         scope.launch {
             comparison = null
+            selectedOverlay = CandidateKind.ORIGINAL
             isRunning = true
             message = "$sourceLabel 이미지를 불러오는 중..."
             runCatching {
@@ -136,6 +139,7 @@ fun OcrExperimentScreen() {
                     val source = bitmap ?: return@TopControls
                     scope.launch {
                         isRunning = true
+                        selectedOverlay = CandidateKind.ORIGINAL
                         message = "원본과 180도 회전 이미지 OCR 분석 중..."
                         runCatching { runner.runOriginalAndRotated(source) }
                             .onSuccess {
@@ -151,8 +155,14 @@ fun OcrExperimentScreen() {
                 }
             )
 
-            val overlayBitmap = chooseOverlayBitmap(bitmap, rotatedBitmap, comparison)
-            val overlayAnalysis = chooseOverlayAnalysis(comparison)
+            OverlaySelector(
+                comparison = comparison,
+                selectedOverlay = selectedOverlay,
+                onSelectedOverlayChange = { selectedOverlay = it }
+            )
+
+            val overlayBitmap = chooseOverlayBitmap(bitmap, rotatedBitmap, selectedOverlay)
+            val overlayAnalysis = chooseOverlayAnalysis(comparison, selectedOverlay)
             ImageOverlayPanel(
                 bitmap = overlayBitmap,
                 analysis = overlayAnalysis,
@@ -171,6 +181,31 @@ fun OcrExperimentScreen() {
                     .fillMaxWidth()
                     .heightIn(min = 220.dp, max = 360.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun OverlaySelector(
+    comparison: OrientationComparison?,
+    selectedOverlay: CandidateKind,
+    onSelectedOverlayChange: (CandidateKind) -> Unit
+) {
+    if (comparison == null) return
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("오버레이 보기:", style = MaterialTheme.typography.labelMedium)
+        OutlinedButton(
+            onClick = { onSelectedOverlayChange(CandidateKind.ORIGINAL) },
+            enabled = selectedOverlay != CandidateKind.ORIGINAL
+        ) {
+            Text("원본")
+        }
+        OutlinedButton(
+            onClick = { onSelectedOverlayChange(CandidateKind.ROTATED_180) },
+            enabled = selectedOverlay != CandidateKind.ROTATED_180
+        ) {
+            Text("180도 회전")
         }
     }
 }
@@ -398,15 +433,18 @@ private fun LogPanel(text: String, onCopyLog: () -> Unit, modifier: Modifier = M
 private fun chooseOverlayBitmap(
     original: Bitmap?,
     rotated: Bitmap?,
-    comparison: OrientationComparison?
-): Bitmap? = when (comparison?.orientationDecision) {
-    OrientationDecision.ROTATED_180 -> rotated ?: original
-    else -> original
+    selectedOverlay: CandidateKind
+): Bitmap? = when (selectedOverlay) {
+    CandidateKind.ORIGINAL -> original
+    CandidateKind.ROTATED_180 -> rotated ?: original
 }
 
-private fun chooseOverlayAnalysis(comparison: OrientationComparison?): CandidateAnalysis? = when (comparison?.orientationDecision) {
-    OrientationDecision.ROTATED_180 -> comparison.rotated180
-    else -> comparison?.original
+private fun chooseOverlayAnalysis(
+    comparison: OrientationComparison?,
+    selectedOverlay: CandidateKind
+): CandidateAnalysis? = when (selectedOverlay) {
+    CandidateKind.ORIGINAL -> comparison?.original
+    CandidateKind.ROTATED_180 -> comparison?.rotated180
 }
 
 private fun OrientationComparison.displayText(): String = when (orientationDecision) {
