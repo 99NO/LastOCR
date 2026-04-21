@@ -185,10 +185,11 @@ class PunctuationOrientationAnalyzer(
             boundingBox?.toCornerPoints().orEmpty()
         }
         val safeCorners = corners.ifEmpty { listOf(PointF(0f, 0f), PointF(1f, 0f), PointF(1f, 1f), PointF(0f, 1f)) }
-        val topLeft = safeCorners.getOrElse(0) { safeCorners.first() }
-        val topRight = safeCorners.getOrElse(1) { topLeft }
-        val bottomRight = safeCorners.getOrElse(2) { topRight }
-        val bottomLeft = safeCorners.getOrElse(3) { topLeft }
+        val visualCorners = safeCorners.toVisualTopBottomCorners()
+        val topLeft = visualCorners[0]
+        val topRight = visualCorners[1]
+        val bottomRight = visualCorners[2]
+        val bottomLeft = visualCorners[3]
 
         val topMid = midpoint(topLeft, topRight)
         val bottomMid = midpoint(bottomLeft, bottomRight)
@@ -205,7 +206,7 @@ class PunctuationOrientationAnalyzer(
             lineIndexInBlock = lineIndexInBlock,
             text = text,
             boundingBox = boundingBox,
-            cornerPoints = safeCorners,
+            cornerPoints = visualCorners,
             origin = topMid,
             u = u,
             v = v,
@@ -285,6 +286,24 @@ private fun Rect.toCornerPoints(): List<PointF> = listOf(
     PointF(right.toFloat(), bottom.toFloat()),
     PointF(left.toFloat(), bottom.toFloat())
 )
+
+private fun List<PointF>.toVisualTopBottomCorners(): List<PointF> {
+    if (size < 4) return this
+
+    // ML Kit corner order is useful for drawing, but the dot rule needs visual
+    // top/bottom in the candidate image. Rebuilding the line axes from image Y
+    // prevents ABOVE/BELOW from flipping when the OCR polygon order is not the
+    // same as screen-space top/bottom.
+    val byY = take(4).sortedWith(compareBy<PointF> { it.y }.thenBy { it.x })
+    val top = byY.take(2).sortedBy { it.x }
+    val bottom = byY.drop(2).sortedBy { it.x }
+    return listOf(
+        top[0],
+        top[1],
+        bottom[1],
+        bottom[0]
+    )
+}
 
 private fun List<PointF>.centroidOrNull(): PointF? {
     if (isEmpty()) return null
