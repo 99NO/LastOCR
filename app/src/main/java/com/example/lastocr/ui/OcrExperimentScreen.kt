@@ -247,7 +247,7 @@ private fun TopControls(
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "dot v: 위 < ${PunctuationOrientationAnalyzer.DEFAULT_ABOVE_THRESHOLD}, 아래 > ${PunctuationOrientationAnalyzer.DEFAULT_BELOW_THRESHOLD}, 점수 차이 < ${PunctuationOrientationAnalyzer.DEFAULT_SCORE_GAP_THRESHOLD}면 보류",
+                text = "dot v: above < ${PunctuationOrientationAnalyzer.DEFAULT_ABOVE_THRESHOLD}, below > ${PunctuationOrientationAnalyzer.DEFAULT_BELOW_THRESHOLD}",
                 style = MaterialTheme.typography.labelSmall
             )
             comparison?.let {
