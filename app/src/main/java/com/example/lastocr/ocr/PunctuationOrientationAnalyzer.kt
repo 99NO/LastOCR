@@ -1,10 +1,12 @@
 package com.example.lastocr.ocr
 
+import android.graphics.Bitmap
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
 import com.example.lastocr.ocr.model.CandidateAnalysis
 import com.example.lastocr.ocr.model.CandidateKind
+import com.example.lastocr.ocr.model.DotCenterSource
 import com.example.lastocr.ocr.model.DotObservation
 import com.example.lastocr.ocr.model.DotPositionDecision
 import com.example.lastocr.ocr.model.LineGeometry
@@ -18,9 +20,10 @@ import kotlin.math.sqrt
 class PunctuationOrientationAnalyzer(
     private val aboveThreshold: Float = DEFAULT_ABOVE_THRESHOLD,
     private val belowThreshold: Float = DEFAULT_BELOW_THRESHOLD,
-    private val scoreGapThreshold: Float = DEFAULT_SCORE_GAP_THRESHOLD
+    private val scoreGapThreshold: Float = DEFAULT_SCORE_GAP_THRESHOLD,
+    private val dotInkDetector: DotInkDetector = DotInkDetector()
 ) {
-    fun analyze(kind: CandidateKind, result: Text): CandidateAnalysis {
+    fun analyze(kind: CandidateKind, result: Text, bitmap: Bitmap): CandidateAnalysis {
         val lines = mutableListOf<LineGeometry>()
         val dots = mutableListOf<DotObservation>()
         var elementCount = 0
@@ -46,11 +49,13 @@ class PunctuationOrientationAnalyzer(
                                 symbolText = symbol.text,
                                 symbolBoundingBox = symbol.boundingBox,
                                 symbolCornerPoints = symbol.cornerPoints,
+                                parentElementBoundingBox = element.boundingBox,
                                 parentElementText = element.text,
                                 parentLineText = line.text,
                                 blockIndex = blockIndex,
                                 lineIndexInBlock = lineIndex,
-                                geometry = geometry
+                                geometry = geometry,
+                                bitmap = bitmap
                             )
                         }
                     }
@@ -118,21 +123,36 @@ class PunctuationOrientationAnalyzer(
         symbolText: String,
         symbolBoundingBox: Rect?,
         symbolCornerPoints: Array<Point>?,
+        parentElementBoundingBox: Rect?,
         parentElementText: String,
         parentLineText: String,
         blockIndex: Int,
         lineIndexInBlock: Int,
-        geometry: LineGeometry
+        geometry: LineGeometry,
+        bitmap: Bitmap
     ): DotObservation {
         val symbolCorners = symbolCornerPoints.toPointFList()
-        val center = symbolCorners.centroidOrNull()
+        val mlKitCenter = symbolCorners.centroidOrNull()
             ?: symbolBoundingBox?.centerPointF()
             ?: PointF(geometry.origin.x, geometry.origin.y)
+        val imageInkCenter = dotInkDetector.detect(
+            bitmap = bitmap,
+            lineGeometry = geometry,
+            symbolBox = symbolBoundingBox,
+            elementBox = parentElementBoundingBox,
+            fallbackCenter = mlKitCenter
+        )
+        val center = imageInkCenter ?: mlKitCenter
+        val centerSource = if (imageInkCenter != null) {
+            DotCenterSource.IMAGE_INK
+        } else {
+            DotCenterSource.ML_KIT_SYMBOL
+        }
 
         // v is the line-local vertical axis from the top edge toward the bottom edge.
         // Projecting the dot center onto v makes the score robust to skewed line polygons.
         val relative = PointF(center.x - geometry.origin.x, center.y - geometry.origin.y)
-        val normalizedV = dot(relative, geometry.v) / max(1f, geometry.lineHeight)
+        val normalizedV = (dot(relative, geometry.v) / max(1f, geometry.lineHeight)).coerceIn(0f, 1f)
         val decision = when {
             normalizedV < aboveThreshold -> DotPositionDecision.ABOVE
             normalizedV > belowThreshold -> DotPositionDecision.BELOW
@@ -148,6 +168,7 @@ class PunctuationOrientationAnalyzer(
             blockIndex = blockIndex,
             lineIndexInBlock = lineIndexInBlock,
             center = center,
+            centerSource = centerSource,
             normalizedV = normalizedV,
             decision = decision
         )
@@ -204,7 +225,8 @@ class PunctuationOrientationAnalyzer(
         analysis.dots.forEachIndexed { index, dot ->
             appendLine(
                 "${index + 1}. ${dot.decision.toKoreanLabel()} " +
-                    "(v=${dot.normalizedV.format2()})  ${dot.parentLineText.compactLine()}"
+                    "(v=${dot.normalizedV.format2()}, ${dot.centerSource.toKoreanLabel()})  " +
+                    dot.parentLineText.compactLine()
             )
         }
     }
@@ -234,6 +256,11 @@ private fun DotPositionDecision.toKoreanLabel(): String = when (this) {
     DotPositionDecision.ABOVE -> "위"
     DotPositionDecision.BELOW -> "아래"
     DotPositionDecision.UNCERTAIN -> "애매"
+}
+
+private fun DotCenterSource.toKoreanLabel(): String = when (this) {
+    DotCenterSource.IMAGE_INK -> "이미지점"
+    DotCenterSource.ML_KIT_SYMBOL -> "MLKit박스"
 }
 
 private fun String.toKoreanReason(): String = when (this) {

@@ -14,6 +14,11 @@ enum class DotPositionDecision(val label: String) {
     UNCERTAIN("UNCERTAIN")
 }
 
+enum class DotCenterSource {
+    IMAGE_INK,
+    ML_KIT_SYMBOL
+}
+
 enum class OrientationDecision {
     ORIGINAL,
     ROTATED_180,
@@ -41,6 +46,7 @@ data class DotObservation(
     val blockIndex: Int,
     val lineIndexInBlock: Int,
     val center: PointF,
+    val centerSource: DotCenterSource,
     val normalizedV: Float,
     val decision: DotPositionDecision
 )

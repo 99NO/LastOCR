@@ -24,8 +24,8 @@ class MlKitOcrRunner(
             val originalText = recognizer.process(InputImage.fromBitmap(bitmap, 0)).await()
             val rotatedBitmap = bitmap.rotate180()
             val rotatedText = recognizer.process(InputImage.fromBitmap(rotatedBitmap, 0)).await()
-            val original = analyzer.analyze(CandidateKind.ORIGINAL, originalText)
-            val rotated = analyzer.analyze(CandidateKind.ROTATED_180, rotatedText)
+            val original = analyzer.analyze(CandidateKind.ORIGINAL, originalText, bitmap)
+            val rotated = analyzer.analyze(CandidateKind.ROTATED_180, rotatedText, rotatedBitmap)
             analyzer.compare(original, rotated)
         } finally {
             recognizer.close()
