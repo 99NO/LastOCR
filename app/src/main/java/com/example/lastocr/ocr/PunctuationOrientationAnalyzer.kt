@@ -91,16 +91,18 @@ class PunctuationOrientationAnalyzer(
             else -> "punctuation_score_higher"
         }
         val finalLog = buildString {
+            appendLine("[결론]")
+            appendLine("방향 후보: ${decision.toKoreanLabel()}")
+            appendLine("이유: ${reason.toKoreanReason()}")
+            appendLine("점수 차이: ${gap.format2()} (기준 ${scoreGapThreshold.format2()})")
+            appendLine()
+            appendLine("[점수 비교]")
+            appendLine("원본: ${original.punctuationScore.format2()}  ${original.simpleCountText()}")
+            appendLine("180도 회전: ${rotated180.punctuationScore.format2()}  ${rotated180.simpleCountText()}")
+            appendLine()
             appendLine(original.logText)
             appendLine()
             appendLine(rotated180.logText)
-            appendLine()
-            appendLine("[final]")
-            appendLine("orientationDecision=$decision")
-            appendLine("reason=$reason")
-            appendLine("scoreGap=${gap.format4()}")
-            appendLine("scoreGapThreshold=${scoreGapThreshold.format2()}")
-            appendLine("note=experimental_dot_position_only")
         }
         return OrientationComparison(
             original = original,
@@ -191,35 +193,58 @@ class PunctuationOrientationAnalyzer(
     }
 
     private fun buildCandidateLog(analysis: CandidateAnalysis): String = buildString {
-        appendLine("[image candidate] ${analysis.kind.label}")
-        appendLine(
-            "[summary] blocks=${analysis.blockCount} lines=${analysis.lineCount} " +
-                "elements=${analysis.elementCount} dots=${analysis.totalDotCount} " +
-                "above=${analysis.aboveCount} below=${analysis.belowCount} " +
-                "uncertain=${analysis.uncertainCount} score=${analysis.punctuationScore.format4()}"
-        )
+        appendLine("[${analysis.kind.toKoreanLabel()}]")
+        appendLine("점수: ${analysis.punctuationScore.format2()}  ${analysis.simpleCountText()}")
+        appendLine("읽은 줄: ${analysis.lineCount}개")
         if (analysis.dots.isEmpty()) {
-            appendLine()
-            appendLine("[no dots]")
-            appendLine("No Symbol text exactly matching \".\" was found.")
+            appendLine("마침표 Symbol을 찾지 못했습니다.")
+            return@buildString
         }
+        appendLine("마침표 위치:")
         analysis.dots.forEachIndexed { index, dot ->
-            appendLine()
-            appendLine("[dot ${index + 1}]")
-            appendLine("block=${dot.blockIndex} line=${dot.lineIndexInBlock} element=\"${dot.parentElementText}\"")
-            appendLine("lineText=\"${dot.parentLineText}\"")
-            appendLine("symbol=\"${dot.symbolText}\"")
-            appendLine("center=(${dot.center.x.format1()}, ${dot.center.y.format1()})")
-            appendLine("normalizedV=${dot.normalizedV.format2()}")
-            appendLine("decision=${dot.decision.label}")
+            appendLine(
+                "${index + 1}. ${dot.decision.toKoreanLabel()} " +
+                    "(v=${dot.normalizedV.format2()})  ${dot.parentLineText.compactLine()}"
+            )
         }
     }
 
     companion object {
-        const val DEFAULT_ABOVE_THRESHOLD = 0.42f
-        const val DEFAULT_BELOW_THRESHOLD = 0.58f
+        const val DEFAULT_ABOVE_THRESHOLD = 0.49f
+        const val DEFAULT_BELOW_THRESHOLD = 0.51f
         const val DEFAULT_SCORE_GAP_THRESHOLD = 0.15f
     }
+}
+
+private fun CandidateAnalysis.simpleCountText(): String =
+    "마침표 ${totalDotCount}개 (아래 $belowCount / 위 $aboveCount / 애매 $uncertainCount)"
+
+private fun CandidateKind.toKoreanLabel(): String = when (this) {
+    CandidateKind.ORIGINAL -> "원본"
+    CandidateKind.ROTATED_180 -> "180도 회전"
+}
+
+private fun OrientationDecision.toKoreanLabel(): String = when (this) {
+    OrientationDecision.ORIGINAL -> "원본"
+    OrientationDecision.ROTATED_180 -> "180도 회전"
+    OrientationDecision.UNCERTAIN -> "판정 보류"
+}
+
+private fun DotPositionDecision.toKoreanLabel(): String = when (this) {
+    DotPositionDecision.ABOVE -> "위"
+    DotPositionDecision.BELOW -> "아래"
+    DotPositionDecision.UNCERTAIN -> "애매"
+}
+
+private fun String.toKoreanReason(): String = when (this) {
+    "score_gap_below_threshold" -> "두 후보 점수 차이가 작습니다."
+    "punctuation_score_higher" -> "마침표가 아래쪽에 더 많이 나온 후보입니다."
+    else -> this
+}
+
+private fun String.compactLine(maxLength: Int = 42): String {
+    val oneLine = replace(Regex("\\s+"), " ").trim()
+    return if (oneLine.length <= maxLength) "\"$oneLine\"" else "\"${oneLine.take(maxLength - 1)}...\""
 }
 
 private fun Array<Point>?.toPointFList(): List<PointF> =
@@ -250,8 +275,4 @@ private fun normalize(point: PointF): PointF {
     return if (len < 0.0001f) PointF(0f, 1f) else PointF(point.x / len, point.y / len)
 }
 
-private fun Float.format1(): String = String.format("%.1f", this)
-
 private fun Float.format2(): String = String.format("%.2f", this)
-
-private fun Float.format4(): String = String.format("%.4f", this)

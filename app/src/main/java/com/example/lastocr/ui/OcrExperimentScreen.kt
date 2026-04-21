@@ -212,7 +212,7 @@ private fun TopControls(
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "threshold: above < ${PunctuationOrientationAnalyzer.DEFAULT_ABOVE_THRESHOLD}, below > ${PunctuationOrientationAnalyzer.DEFAULT_BELOW_THRESHOLD}, gap < ${PunctuationOrientationAnalyzer.DEFAULT_SCORE_GAP_THRESHOLD} => UNCERTAIN",
+                text = "dot v: 위 < ${PunctuationOrientationAnalyzer.DEFAULT_ABOVE_THRESHOLD}, 아래 > ${PunctuationOrientationAnalyzer.DEFAULT_BELOW_THRESHOLD}, 점수 차이 < ${PunctuationOrientationAnalyzer.DEFAULT_SCORE_GAP_THRESHOLD}면 보류",
                 style = MaterialTheme.typography.labelSmall
             )
             comparison?.let {
@@ -293,16 +293,10 @@ private fun AnalysisOverlay(
                     close()
                 }
                 drawPath(path, color = Color(0xFF16A34A), style = Stroke(width = 2f))
-                drawContext.canvas.nativeCanvas.drawText(
-                    "${line.blockIndex}:${line.lineIndexInBlock}",
-                    points[0].x,
-                    points[0].y - 4f,
-                    labelPaint
-                )
             }
         }
 
-        analysis.dots.forEach { dot ->
+        analysis.dots.forEachIndexed { index, dot ->
             val center = mapper.map(dot.center)
             val color = when (dot.decision.label) {
                 "ABOVE" -> Color(0xFFDC2626)
@@ -311,7 +305,7 @@ private fun AnalysisOverlay(
             }
             drawCircle(color = color, radius = 7f, center = center)
             drawCircle(color = Color.White, radius = 8f, center = center, style = Stroke(width = 2f))
-            val label = dot.decision.label.first().toString()
+            val label = (index + 1).toString()
             drawContext.canvas.nativeCanvas.drawText(label, center.x + 10f, center.y - 8f, labelPaint)
         }
     }
