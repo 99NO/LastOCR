@@ -98,7 +98,6 @@ class PunctuationOrientationAnalyzer(
         val finalLog = buildString {
             appendLine("[결론]")
             appendLine("방향 후보: ${decision.toKoreanLabel()}")
-            appendLine("이유: ${reason.toKoreanReason()}")
             appendLine("점수 차이: ${gap.format2()} (기준 ${scoreGapThreshold.format2()})")
             appendLine()
             appendLine("[점수 비교]")
@@ -240,7 +239,7 @@ class PunctuationOrientationAnalyzer(
 }
 
 private fun CandidateAnalysis.simpleCountText(): String =
-    "마침표 ${totalDotCount}개 (아래 $belowCount / 위 $aboveCount / 애매 $uncertainCount)"
+    "마침표 ${totalDotCount}개 (below $belowCount / above $aboveCount / uncertain $uncertainCount)"
 
 private fun CandidateKind.toKoreanLabel(): String = when (this) {
     CandidateKind.ORIGINAL -> "원본"
@@ -254,20 +253,14 @@ private fun OrientationDecision.toKoreanLabel(): String = when (this) {
 }
 
 private fun DotPositionDecision.toKoreanLabel(): String = when (this) {
-    DotPositionDecision.ABOVE -> "위"
-    DotPositionDecision.BELOW -> "아래"
-    DotPositionDecision.UNCERTAIN -> "애매"
+    DotPositionDecision.ABOVE -> "above"
+    DotPositionDecision.BELOW -> "below"
+    DotPositionDecision.UNCERTAIN -> "uncertain"
 }
 
 private fun DotCenterSource.toKoreanLabel(): String = when (this) {
     DotCenterSource.IMAGE_INK -> "이미지점"
     DotCenterSource.ML_KIT_SYMBOL -> "MLKit박스"
-}
-
-private fun String.toKoreanReason(): String = when (this) {
-    "score_gap_below_threshold" -> "두 후보 점수 차이가 작습니다."
-    "punctuation_score_higher" -> "마침표가 아래쪽에 더 많이 나온 후보입니다."
-    else -> this
 }
 
 private fun String.compactLine(maxLength: Int = 42): String {
