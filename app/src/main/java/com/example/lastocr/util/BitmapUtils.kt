@@ -12,6 +12,8 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private const val MAX_LONG_SIDE_FOR_OCR: Int = 3072
+
 suspend fun decodeBitmapFromUri(context: Context, uri: Uri): Bitmap = withContext(Dispatchers.IO) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
         val source = ImageDecoder.createSource(context.contentResolver, uri)
@@ -22,7 +24,7 @@ suspend fun decodeBitmapFromUri(context: Context, uri: Uri): Bitmap = withContex
     } else {
         @Suppress("DEPRECATION")
         MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-    }.asArgb8888()
+    }.asArgb8888().downscaleForOcr()
 }
 
 fun Bitmap.rotate180(): Bitmap {
@@ -43,4 +45,14 @@ fun createImageCaptureUri(context: Context): Uri {
 private fun Bitmap.asArgb8888(): Bitmap {
     if (config == Bitmap.Config.ARGB_8888) return this
     return copy(Bitmap.Config.ARGB_8888, false)
+}
+
+private fun Bitmap.downscaleForOcr(): Bitmap {
+    val longSide = maxOf(width, height)
+    if (longSide <= MAX_LONG_SIDE_FOR_OCR) return this
+
+    val scale = MAX_LONG_SIDE_FOR_OCR.toFloat() / longSide
+    val targetWidth = (width * scale).toInt().coerceAtLeast(1)
+    val targetHeight = (height * scale).toInt().coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(this, targetWidth, targetHeight, true)
 }

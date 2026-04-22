@@ -114,6 +114,10 @@ enum class DotCenterSource {
 
 이미지 Uri 디코딩, 카메라 촬영 Uri 생성, 180도 회전을 담당한다.
 
+카메라 사진은 원본 해상도가 매우 커서 OCR과 이미지점 검출이 느려질 수 있다. 그래서 현재는 decode 후 긴 변이 `3072px`을 넘으면 비율을 유지해 downscale한다. 이 값은 `BitmapUtils.kt`의 `MAX_LONG_SIDE_FOR_OCR` 상수로 관리한다.
+
+이 최적화는 속도 개선 목적이다. 만약 작은 글자가 많은 문서에서 OCR 품질이 떨어지면 이 상수를 더 크게 올리거나, `downscaleForOcr()` 호출을 제거하면 이전처럼 원본 크기 bitmap을 사용할 수 있다.
+
 ### `util/OverlayMapper.kt`
 
 ML Kit 좌표는 원본 이미지 픽셀 좌표계이고, Compose 화면의 이미지 표시 크기는 기기 화면에 맞게 변한다. 이 파일은 이미지 픽셀 좌표를 Canvas 좌표로 변환한다.
